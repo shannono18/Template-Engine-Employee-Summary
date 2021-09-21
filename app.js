@@ -1,35 +1,168 @@
-const Manager = require("./lib/Manager");
-const Engineer = require("./lib/Engineer");
-const Intern = require("./lib/Intern");
-const inquirer = require("inquirer");
-const path = require("path");
-const fs = require("fs");
+const mysql = require('mysql2')
+const { prompt } = require('inquirer')
+const cTable = require('console.table')
 
-const OUTPUT_DIR = path.resolve(__dirname, "output");
-const outputPath = path.join(OUTPUT_DIR, "team.html");
+const db = mysql.createConnection('mysql://root:rootroot@localhost:3306/employees_db')
 
-const render = require("./lib/htmlRenderer");
+const buildDepartment = () => {
+  prompt({
+    type: 'input',
+    name: 'name',
+    message: 'Input Department Name'
+  })
+  .then(({ name }) => {
+    let departmentName = {
+      name: name
+    }
+    db.query('INSERT INTO departments SET ?', departmentName, err => {
+      if (err) {console.log(err)}
+    })
+    console.log('Department created!')
+    menu()
+  })
+}
 
+const buildRole = () => {
+  prompt([{
+    type: 'input',
+    name: 'title',
+    message: 'Input Role Title'
+  },
+  {
+    type: 'number',
+    name: 'salary',
+    message: 'Input salary'
+  },
+  {
+    type: 'number',
+    name: 'department',
+    message: 'Input Department ID'
+  }
+])
+  .then(( { title, salary, department }) => {
+    let role = {
+      title: title,
+      salary: salary,
+      department_id: department
+    }
+    db.query('INSERT INTO roles SET ?', role, err => {
+      if (err) { console.log(err) }
+    })
+    console.log('Role created!')
+    menu()
+  })
+}
 
-// Write code to use inquirer to gather information about the development team members,
-// and to create objects for each team member (using the correct classes as blueprints!)
+const buildEmployee = () => {
+  prompt([{
+    type: 'input',
+    name: 'firstName',
+    message: 'Input first name'
+  },
+  {
+    type: 'input',
+    name: 'lastName',
+    message: 'Input last name'
+  },
+  {
+    type: 'number',
+    name: 'role',
+    message: 'Input role ID'
+  },
+  {
+    type: 'input',
+    name: 'manager',
+    message: 'Input manager ID'
+  }])
+  .then(( { firstName, lastName, role, manager }) => {
+    let employee = {
+      first_name: firstName,
+      last_name: lastName,
+      role_id: role,
+      manager_id: manager
+    }
+    db.query('INSERT INTO employees SET ?', employee, err => {
+      if (err) { console.log(err) }
+    })
+    console.log('Employee created!')
+    menu()
+  })
+}
 
-// After the user has input all employees desired, call the `render` function (required
-// above) and pass in an array containing all employee objects; the `render` function will
-// generate and return a block of HTML including templated divs for each employee!
+const view = () => {
+  prompt({
+    type: 'list',
+    name: 'action',
+    message: 'Select what to view',
+    choices: ['Departments', 'Roles', 'Employees', 'Back', 'Exit']
+  })
+  .then(({ action }) => {
+    switch (action) {
+      case 'Departments':
+        db.query('SELECT * FROM departments', (err, departments) => {
+          if (err) { console.log(err) }
+          console.table(departments)
+          process.exit(0)
+        })
+        break
+      case 'Roles':
+        db.query(`SELECT roles.id, roles.title AS role, roles.salary, departments.name AS department
+        FROM roles
+        LEFT JOIN departments
+        ON roles.department_id = departments.id`, (err, roles) => {
+          if (err) { console.log(err) }
+          console.table(roles)
+          process.exit(0)
+        })
+        break
+      case 'Employees':
+        db.query(`Select CONCAT(employees.first_name, ' ', employees.last_name) AS name, roles.title AS role, departments.name AS department, CONCAT(manager.first_name, ' ', manager.last_name) AS manager
+        FROM employees
+        LEFT JOIN roles
+        on employees.role_id = roles.id
+        LEFT JOIN departments
+        ON roles.department_id = departments.id
+        LEFT JOIN employees manager
+        ON manager.id = employees.manager_id`, (err, employees) => {
+          if (err) { console.log(err) }
+          console.table(employees)
+          process.exit(0)
+        })
+        break
+      case 'Back':
+        menu()
+        break
+      case 'Exit':
+        console.log('Goodbye!')
+        process.exit(0)
+        break
+    }
+  })
+}
 
-// After you have your html, you're now ready to create an HTML file using the HTML
-// returned from the `render` function. Now write it to a file named `team.html` in the
-// `output` folder. You can use the variable `outputPath` above target this location.
-// Hint: you may need to check if the `output` folder exists and create it if it
-// does not.
+const menu = () => {
+  prompt({
+    type: 'list',
+    name: 'action',
+    message: 'What would you like to do?',
+    choices: ['Create new department', 'Create new role', 'Create new employee', 'View']
+  })
+  .then(({ action }) => {
+    switch (action) {
+      case 'Create new department':
+        buildDepartment()
+        break
+      case 'Create new role':
+        buildRole()
+        break
+      case 'Create new employee':
+        buildEmployee()
+        break
+      case 'View':
+        view()
+        break
+    }
+  })
+}
 
-// HINT: each employee type (manager, engineer, or intern) has slightly different
-// information; write your code to ask different questions via inquirer depending on
-// employee type.
-
-// HINT: make sure to build out your classes first! Remember that your Manager, Engineer,
-// and Intern classes should all extend from a class named Employee; see the directions
-// for further information. Be sure to test out each class and verify it generates an
-// object with the correct structure and methods. This structure will be crucial in order
-// for the provided `render` function to work! ```
+menu()
