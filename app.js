@@ -4,6 +4,9 @@ const Intern = require("./lib/Intern");
 const inquire = require("inquirer");
 const fs = require("fs");
 
+const render = require("./lib/htmlRenderer");
+
+
 var teamList = [];
 const managerQuestions = [
     {
